@@ -1,0 +1,6 @@
+@apiprogresstracker_HostAddress = http://localhost:5114
+
+GET {{apiprogresstracker_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
