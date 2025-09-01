@@ -10,6 +10,6 @@ namespace apiprogresstracker.Model.Notes
     {
         public int Id { get; set; }
         public string? Notes_content { get; set; }
-        public DateTime? Date_Created { get; set; }
+        public DateOnly? Date_Created { get; set; }
     }
 }
