@@ -28,9 +28,18 @@ namespace apiprogresstracker.ApplicationDBContext
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-        }
-        
-        
+
+            modelBuilder.Entity<TaskTitle>()
+               .HasMany(t => t.TaskContents)
+               .WithOne(u => u.TaskTitle)
+               .HasForeignKey(t => t.Title_id);
+
+             modelBuilder.Entity<TaskContents>()
+               .HasMany(t => t.TaskSubContents)
+               .WithOne(u => u.TaskContents)
+               .HasForeignKey(t => t.Contents_id);
+
+         }
     }
 
 }
