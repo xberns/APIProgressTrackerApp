@@ -19,6 +19,11 @@ namespace apiprogresstracker.Controller
         [HttpPost]
         public async Task<ActionResult<Notes>> PostNotes(Notes notes)
         {
+            var note = await _context.Notes.Where(x => x.Date_created == notes.Date_created).Select(x => x.Notes_content).ToListAsync();
+            if (note.Count > 0)
+            {
+                return StatusCode(409, "Already exist.");
+            }
             try
             {
                 if (notes == null)
@@ -52,12 +57,13 @@ namespace apiprogresstracker.Controller
             var formatdate = new DateOnly(date.Year, date.Month, date.Day);
             try
             {
-                var note = await _context.Notes.Where(x => x.Date_Created == formatdate).Select(x => x.Notes_content).ToListAsync();
+                var note = await _context.Notes.Where(x => x.Date_created == formatdate).Select(x => x.Notes_content).ToListAsync();
 
-                if (note == null){
+                if (note == null)
+                {
                     return NotFound();
                 }
-                    
+
                 return Ok(note);
             }
             catch
@@ -65,6 +71,79 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, "An error occurred while fetching.");
             }
         }
+
+        [HttpPut]
+        public async Task<ActionResult> UpdateNote(Notes note)
+        {
+            try
+            {
+
+                var notess = await _context.Notes.Where(x => x.Date_created == note.Date_created).FirstOrDefaultAsync();
+
+
+                if (notess == null)
+                {
+                    return StatusCode(404, "Does not exist");
+                }
+
+                notess.Notes_content = note.Notes_content;
+
+                var saved = await _context.SaveChangesAsync();
+                if (saved > 0)
+                {
+                    return Ok(new
+                    {
+                        message = "Data updated successfully.",
+                        data = note.Notes_content
+                    });
+                }
+
+                return StatusCode(500, "An unknown error occurred while saving.");
+
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Optional: handle concurrency issues
+                return StatusCode(500, "A concurrency error occurred.");
+            }
+        }
+        
+        [HttpDelete]
+        public async Task<ActionResult> DeleteNote(DateTime date)
+        {
+            try
+            {
+                var formatdate = new DateOnly(date.Year, date.Month, date.Day);
+
+                var notess = await _context.Notes.Where(x => x.Date_created == formatdate).FirstOrDefaultAsync();
+
+
+                if (notess == null)
+                {
+                    return StatusCode(404, "Does not exist");
+                }
+
+               _context.Notes.Remove(notess);
+
+                var saved = await _context.SaveChangesAsync();
+                if (saved > 0)
+                {
+                    return Ok(new
+                    {
+                        message = "Data deleted successfully.",
+                    });
+                }
+
+                return StatusCode(500, "An unknown error occurred while saving.");
+
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Optional: handle concurrency issues
+                return StatusCode(500, "A concurrency error occurred.");
+            }
+        }
+
 
 
     }
