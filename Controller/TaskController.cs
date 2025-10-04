@@ -229,5 +229,41 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, "A concurrency error occurred.");
             }
         }
+
+         [HttpPut("UpdateTaskContentStatus")]
+        public async Task<ActionResult> UpdateTaskContentStatus(UpdateStatus data)
+        {
+            try
+            {
+
+                var get = await _context.TaskContents.Where(x => x.Title_id == data.Title_id && x.Id == data.Id).FirstOrDefaultAsync();
+                if (data == null)
+                {
+                    return StatusCode(404, "Does not exist");
+                }
+                if (get.Date_started == get.Date_created)
+                {
+                    get.Date_started = data.Status_modified;
+                }
+                get.Status = data.Status;
+                get.Status_modified = data.Status_modified;
+
+                var saved = await _context.SaveChangesAsync();
+                if (saved > 0)
+                {
+                    return Ok(new
+                    {
+                        message = "Data updated successfully.",
+                    });
+                }
+                 return StatusCode(500, "An unknown error occured while saving the data.");
+
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return StatusCode(500, "A concurrency error occurred.");
+            }
+        }
+    
     }
 }
