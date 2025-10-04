@@ -49,8 +49,9 @@ namespace APIProgressTrackerApp.DTO.TaskDTO
     }
     public class UpdateStatus
     {
-        public int Id {get; set;}
-        public int? Status_id { get; set; }
+        public int? Id {get; set;}
+        public int? Title_id { get; set; }
+        public int? Status { get; set; }
         public DateTime? Status_modified { get; set; }
     }
     public class GetTaskContent
