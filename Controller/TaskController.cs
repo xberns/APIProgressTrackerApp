@@ -92,7 +92,6 @@ namespace apiprogresstracker.Controller
                     var taskContent = new TaskContents
                     {
                         Title_id = data.Title_id,
-                        Task_order = data.Task_order,
                         Task_details = data.Task_details,
                         Date_created = data.Date_created,
                         Status = 0,
@@ -123,7 +122,78 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
+        [HttpPost("AddNewTaskContent")]
+        public async Task<ActionResult> AddNewTaskContent(ModifyTaskContent datas)
+        {
+            try
+            {
+                if (datas == null )
+                {
+                    return BadRequest("Parameter is null or empty.");
+                }
 
+             
+                    var taskContent = new TaskContents
+                    {
+                        Title_id = datas.Title_id,
+                        Task_details = datas.Task_details,
+                        Date_created = datas.Date_created,
+                        Status = 0,
+                        Status_modified = datas.Date_created
+
+                    };
+
+                
+                await _context.TaskContents.AddAsync(taskContent);
+                
+                var saved = await _context.SaveChangesAsync();
+
+                if (saved > 0)
+                {
+                    return Ok(new
+                    {
+                        message = "Data saved successfully.",
+                        data = taskContent
+                    });
+                }
+
+                return StatusCode(500, "An unknown error occurred while saving the data.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+        [HttpPut("ModTaskContent")]
+        public async Task<ActionResult> ModTaskContent(ModifyTaskContent datas)
+        {
+            try
+            {
+                if (datas == null )
+                {
+                    return BadRequest("Parameter is null or empty.");
+                }
+                 var get = await _context.TaskContents.Where(x => x.Title_id == datas.Title_id && x.Id == datas.Id).FirstOrDefaultAsync();
+
+                get.Task_details = datas.Task_details;
+             
+                var saved = await _context.SaveChangesAsync();
+
+                if (saved > 0)
+                {
+                    return Ok(new
+                    {
+                        message = "Data saved successfully."
+                    });
+                }
+
+                return StatusCode(500, "An unknown error occurred while saving the data.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
 
         [HttpGet("GetTaskContent")]
         public async Task<IActionResult> GetTaskContent(int id)
