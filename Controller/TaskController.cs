@@ -136,6 +136,7 @@ namespace apiprogresstracker.Controller
                     var taskContent = new TaskContents
                     {
                         Title_id = datas.Title_id,
+                        Task_order = datas.Task_order,
                         Task_details = datas.Task_details,
                         Date_created = datas.Date_created,
                         Status = 0,
@@ -174,7 +175,7 @@ namespace apiprogresstracker.Controller
                     return BadRequest("Parameter is null or empty.");
                 }
                  var get = await _context.TaskContents.Where(x => x.Title_id == datas.Title_id && x.Id == datas.Id).FirstOrDefaultAsync();
-
+               
                 get.Task_details = datas.Task_details;
              
                 var saved = await _context.SaveChangesAsync();
