@@ -175,7 +175,10 @@ namespace apiprogresstracker.Controller
                     return BadRequest("Parameter is null or empty.");
                 }
                  var get = await _context.TaskContents.Where(x => x.Title_id == datas.Title_id && x.Id == datas.Id).FirstOrDefaultAsync();
-               
+                if ( get.Task_details == datas.Task_details)
+                {
+                    return StatusCode(200, "No update necessary; data was identical");
+                }
                 get.Task_details = datas.Task_details;
              
                 var saved = await _context.SaveChangesAsync();
