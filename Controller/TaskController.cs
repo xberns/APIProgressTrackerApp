@@ -252,6 +252,63 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
+         [HttpDelete("DeleteTasksContent")]
+        public async Task<IActionResult> DeleteTasksContent([FromBody] DeleteTaskContent data)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+
+            {
+                if (data == null)
+                {
+                    return BadRequest("Parameter is null.");
+                }
+                 var del = await _context.TaskContents.Where(x => x.Title_id == data.Title_id && x.Id == data.Id).FirstOrDefaultAsync();
+                if (del == null)
+                {
+                    return NotFound();
+                }
+               _context.TaskContents.Remove(del);
+                  var saved =  await _context.SaveChangesAsync();
+                if (saved <= 0)
+                {
+                     await transaction.RollbackAsync();
+                    return StatusCode(500, "Failed to delete data.");
+                }
+
+                var get = await _context.TaskContents
+                         .Where(x => x.Title_id == data.Title_id)
+                         .OrderBy(x => x.Task_order).ToListAsync();
+                          
+            for (int i = 0; i < get.Count; i++)
+            {
+                 get[i].Task_order = i;
+             }
+
+                var savedd = await _context.SaveChangesAsync();
+
+                if (saved > 0 && savedd > 0)
+                {
+                    await transaction.CommitAsync();
+                    return Ok(new
+                    {
+                        message = "Data deleted and reordered successfully."
+                    });
+                }
+                await transaction.RollbackAsync();
+                 if (savedd <= 0)
+                {
+                    return StatusCode(500, "Failed to reorder data.");
+                }
+                return StatusCode(500, "An unknown error occured while saving the data.");
+            }
+
+            catch (Exception ex)
+            {
+                 await transaction.RollbackAsync();
+                return StatusCode(500, ex.Message);
+            }
+        }
 
          [HttpPut("UpdateTasksOrder")]
         public async Task<ActionResult> UpdatTasksOrder([FromBody] List<UpdateOrder> data)
