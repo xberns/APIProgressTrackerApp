@@ -211,7 +211,10 @@ namespace apiprogresstracker.Controller
                 var get = await _context.TaskContents
                           .Where(x => x.Title_id == id)
                           .OrderBy(x => x.Task_order).ToListAsync();
-
+                if (get.Count == 0)
+                {
+                    return Ok(new { task = "0", Message = "If existing dats is not showing, please contact the admin." });
+                }
                 if (get.Count > 0)
                 {
                     return Ok(get);
@@ -279,12 +282,26 @@ namespace apiprogresstracker.Controller
                 var get = await _context.TaskContents
                          .Where(x => x.Title_id == data.Title_id)
                          .OrderBy(x => x.Task_order).ToListAsync();
-                          
-            for (int i = 0; i < get.Count; i++)
-            {
-                 get[i].Task_order = i;
-             }
+                var nonidentical = 0;
 
+                for (int i = 0; i < get.Count; i++)
+                {
+                    if (get[i].Task_order != i)
+                    {
+                        nonidentical = 1;
+                    }
+                    get[i].Task_order = i;
+                   
+                }
+                if (nonidentical == 0)
+                {
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                    return Ok(new
+                    {
+                        message = "Deleted successfully. No reorder needed"
+                    });
+                }
                 var savedd = await _context.SaveChangesAsync();
 
                 if (saved > 0 && savedd > 0)
@@ -297,10 +314,10 @@ namespace apiprogresstracker.Controller
                 }
                 await transaction.RollbackAsync();
                  if (savedd <= 0)
-                {
+                    {
                     return StatusCode(500, "Failed to reorder data.");
-                }
-                return StatusCode(500, "An unknown error occured while saving the data.");
+                    }
+                    return StatusCode(500, "An unknown error occured while saving the data.");
             }
 
             catch (Exception ex)
