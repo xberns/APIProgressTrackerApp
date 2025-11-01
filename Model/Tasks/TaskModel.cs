@@ -32,7 +32,8 @@ namespace apiprogresstracker.Model.Tasks
     public class TaskSubContents
     {
         public int Id { get; set; }
-        public int? Contents_id { get; set; }
+        public int? Content_id { get; set; }
+        public int? Subtask_order { get; set; }
         public string? Subtask { get; set; }
         public DateTime? Date_created { get; set; }
         public int? Status { get; set; }

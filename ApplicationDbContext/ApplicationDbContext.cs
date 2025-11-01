@@ -37,7 +37,7 @@ namespace apiprogresstracker.ApplicationDBContext
              modelBuilder.Entity<TaskContents>()
                .HasMany(t => t.TaskSubContents)
                .WithOne(u => u.TaskContents)
-               .HasForeignKey(t => t.Contents_id);
+               .HasForeignKey(t => t.Content_id);
 
          }
     }
