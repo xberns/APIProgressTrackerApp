@@ -81,11 +81,26 @@ namespace APIProgressTrackerApp.DTO.TaskDTO
         public string? Subtask { get; set; }
         public DateTime? Date_created { get; set; }
     }
-     public class DeleteSubContent
+    public class DeleteSubContent
     {
-        public int Id {get; set; }
+        public int Id { get; set; }
         public int? Title_id { get; set; }
-        
+
+    }
+     public class UpdateSubtaskOrder
+    {
+        public int Id { get; set; }
+        public int? Content_id { get; set; }
+        public int? Subtask_order { get; set; } 
+        public string? Subtask { get; set; } 
+    }
+  
+    public class UpdateSubtaskStatus
+    {
+        public int? Id {get; set;}
+        public int? Content_id { get; set; }
+        public int? Status { get; set; }
+        public DateTime? Status_modified { get; set; }
     }
 
 }
