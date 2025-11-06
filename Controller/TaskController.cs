@@ -186,6 +186,7 @@ namespace apiprogresstracker.Controller
             try
 
             {
+                string msg;
                 if (data == null)
                 {
                     return BadRequest("Parameter is null.");
@@ -201,6 +202,26 @@ namespace apiprogresstracker.Controller
                 {
                     await transaction.RollbackAsync();
                     return StatusCode(500, "Failed to delete data.");
+                }
+                var delSub = await _context.TaskSubContents
+                         .Where(x => x.Content_id == data.Id)
+                         .ToListAsync();
+                var savedd = 0;
+                
+                if (delSub == null || delSub.Count == 0 )
+                {
+                    msg = "";
+                } else
+                {
+                _context.TaskSubContents.RemoveRange(delSub);
+                savedd = await _context.SaveChangesAsync();
+
+                    msg = " Subtask data deleted succesfully.";
+                    if (savedd <= 0)
+                    {
+                        await transaction.RollbackAsync();
+                        return StatusCode(500, "Failed to delete subtask data.");
+                    }
                 }
 
                 var get = await _context.TaskContents
@@ -223,21 +244,21 @@ namespace apiprogresstracker.Controller
                     await transaction.CommitAsync();
                     return Ok(new
                     {
-                        message = "Deleted successfully. No reorder needed"
+                        message = "Deleted successfully. No reorder needed" + msg
                     });
                 }
-                var savedd = await _context.SaveChangesAsync();
+                var saveddd = await _context.SaveChangesAsync();
 
-                if (saved > 0 && savedd > 0)
+                if (saved > 0 && savedd > 0 && saveddd > 0)
                 {
                     await transaction.CommitAsync();
                     return Ok(new
                     {
-                        message = "Data deleted and reordered successfully."
+                        message = "Data deleted and reordered successfully." + msg
                     });
                 }
                 await transaction.RollbackAsync();
-                if (savedd <= 0)
+                if (saveddd <= 0)
                 {
                     return StatusCode(500, "Failed to reorder data.");
                 }
