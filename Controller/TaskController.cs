@@ -74,7 +74,37 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
-
+        [HttpGet("GetAllSubTask")]
+        public async Task<IActionResult> GetTaskandSubTask(int id)
+        {
+            try
+            {
+                if (id < 0)
+                {
+                    return BadRequest();
+                }
+                var get = await _context.TaskSubContents
+                         .Where(x => x.Title_id == id)
+                         .OrderBy(x => x.Content_id)
+                         .ThenBy( x => x.Subtask_order)
+                         .ToListAsync();
+                          
+                          
+                if (get.Count == 0)
+                {
+                    return Ok(new { task = "0", Message = "If existing dats is not showing, please contact the admin." });
+                }   
+                if (get.Count > 0)
+                {
+                    return Ok(get);
+                }
+                return StatusCode(500, "Error occured during transaction");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
          [HttpGet("GetTaskContent")]
         public async Task<IActionResult> GetTaskContent(int id)
         {
@@ -206,7 +236,7 @@ namespace apiprogresstracker.Controller
                 var delSub = await _context.TaskSubContents
                          .Where(x => x.Content_id == data.Id)
                          .ToListAsync();
-                var savedd = 0;
+                var savedd = 1;
                 
                 if (delSub == null || delSub.Count == 0 )
                 {
