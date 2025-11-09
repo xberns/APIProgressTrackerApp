@@ -427,6 +427,7 @@ namespace apiprogresstracker.Controller
              
                     var subtasks = new TaskSubContents
                     {
+                        Title_id = datas.Title_id,
                         Content_id = datas.Content_id,
                         Subtask_order = datas.Subtask_order,
                         Subtask = datas.Subtask,
