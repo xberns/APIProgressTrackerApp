@@ -16,8 +16,8 @@ namespace apiprogresstracker.Controller
             _context = context;
         }
 
-        [HttpPost]
-        public async Task<ActionResult<Notes>> PostNotes(Notes notes)
+        [HttpPost("PostNote")]
+        public async Task<ActionResult<Notes>> PostNote(Notes notes)
         {
             var note = await _context.Notes.Where(x => x.Date_created == notes.Date_created).Select(x => x.Notes_content).ToListAsync();
             if (note.Count > 0)
@@ -51,7 +51,7 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-        [HttpGet]
+        [HttpGet("GetNote")]
         public async Task<ActionResult> GetNote(DateTime date)
         {
             var formatdate = new DateOnly(date.Year, date.Month, date.Day);
@@ -72,7 +72,7 @@ namespace apiprogresstracker.Controller
             }
         }
 
-        [HttpPut]
+        [HttpPut("UpdateNote")]
         public async Task<ActionResult> UpdateNote(Notes note)
         {
             try
@@ -108,7 +108,7 @@ namespace apiprogresstracker.Controller
             }
         }
         
-        [HttpDelete]
+        [HttpDelete("DeleteNote")]
         public async Task<ActionResult> DeleteNote(DateTime date)
         {
             try
