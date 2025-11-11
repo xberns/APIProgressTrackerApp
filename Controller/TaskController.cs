@@ -75,16 +75,16 @@ namespace apiprogresstracker.Controller
             }
         }
         [HttpGet("GetAllSubTask")]
-        public async Task<IActionResult> GetTaskandSubTask(int id)
+        public async Task<IActionResult> GetTaskandSubTask([FromQuery]GetTaskContent data)
         {
             try
             {
-                if (id < 0)
+                if (data.Title_id < 0 || data.User_id == null)
                 {
                     return BadRequest();
                 }
                 var get = await _context.TaskSubContents
-                         .Where(x => x.Title_id == id)
+                         .Where(x => x.Title_id == data.Title_id)
                          .OrderBy(x => x.Content_id)
                          .ThenBy( x => x.Subtask_order)
                          .ToListAsync();
@@ -106,16 +106,16 @@ namespace apiprogresstracker.Controller
             }
         }
          [HttpGet("GetTaskContent")]
-        public async Task<IActionResult> GetTaskContent(int id)
+        public async Task<IActionResult> GetTaskContent([FromQuery]GetTaskContent data)
         {
             try
             {
-                if (id < 0)
+                if (data.Title_id < 0 || data.User_id == null)
                 {
                     return BadRequest();
                 }
                 var get = await _context.TaskContents
-                          .Where(x => x.Title_id == id)
+                          .Where(x => x.Title_id == data.Title_id)
                           .OrderBy(x => x.Task_order).ToListAsync();
                 if (get.Count == 0)
                 {

@@ -73,6 +73,7 @@ namespace APIProgressTrackerApp.DTO.TaskDTO
     {
         
         public int? Title_id { get; set; }
+        public string? User_id { get; set; }
     }
 
     public class AddSubContent
