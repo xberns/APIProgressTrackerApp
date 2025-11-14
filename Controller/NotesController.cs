@@ -57,13 +57,13 @@ namespace apiprogresstracker.Controller
             var formatdate = new DateOnly(date.Year, date.Month, date.Day);
             try
             {
-                var note = await _context.Notes.Where(x => x.Date_created == formatdate).Select(x => x.Notes_content).ToListAsync();
+                var note = await _context.Notes.Where(x => x.Date_created == formatdate).Select(x => x.Notes_content).FirstOrDefaultAsync();
 
-                if (note == null)
+                 if (note == null)
                 {
-                    return NotFound();
+                    return Ok(new { note = "0", Message = "If existing dats is not showing, please contact the admin." });
                 }
-
+          
                 return Ok(note);
             }
             catch
