@@ -24,19 +24,28 @@ namespace apiprogresstracker.Controller
         }
         
         [HttpGet("GetTaskTitle")]
-        public async Task<IActionResult> GetTitle(GetTask datas)
+        public async Task<IActionResult> GetTaskTitle([FromQuery]GetTaskTitle data)
         {
+            if (data == null)
+            {
+                return BadRequest();
+            }
             try
             {
-                if (datas == null)
-                {
-                    return BadRequest();
-                }
-                var get = await _context.TaskTitle.Where(x => x.User == datas.User).ToListAsync();
+                var get = await _context.TaskTitle.Where(x => x.User_id == data.User_id).ToListAsync();
 
                 if (get.Count > 0)
                 {
                     return Ok(get);
+                }
+                if (get.Count == 0)
+                {
+                    return Ok (new
+                             {  
+                                data = "0",
+                                message = "If existing data is not showing, please contact the admin."
+                            });
+                            
                 }
                 return StatusCode(500, "Error occured during transaction");
             }
@@ -45,17 +54,25 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
-        [HttpPost("SaveTaskTitle")]
-        public async Task<ActionResult<TaskTitle>> SaveTitle(TaskTitle datas)
+
+        [HttpPost("AddNewTaskTitle")]
+        public async Task<ActionResult<TaskTitle>> AddNewTaskTitle(ModifyTaskTitle data)
         {
+            if (data == null)
+            {
+                return BadRequest();
+            }
             try
             {
-                if (datas == null)
-                {
-                    return BadRequest("Parameter is null.");
-                }
+                 var taskTitleDetails = new TaskTitle
+                    {
+                        Task_title = data.Task_title,
+                        User_id = data.User_id,
+                        Date_created = data.Date_created,
 
-                await _context.TaskTitle.AddAsync(datas);
+                    };
+                    
+                await _context.TaskTitle.AddAsync(taskTitleDetails);
                 var saved = await _context.SaveChangesAsync();
 
                 if (saved > 0)
@@ -63,7 +80,7 @@ namespace apiprogresstracker.Controller
                     return Ok(new
                     {
                         message = "Data saved successfully.",
-                        data = datas
+                        data = taskTitleDetails
                     });
                 }
                 return StatusCode(500, "An unknown error occured while saving the data.");
@@ -74,48 +91,145 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
-        [HttpGet("GetAllSubTask")]
-        public async Task<IActionResult> GetTaskandSubTask([FromQuery]GetTaskContent data)
+
+         [HttpPut("ModTaskTitle")]
+        public async Task<ActionResult> ModTaskTitle(ModifyTaskTitle data)
         {
+            if (data == null)
+            {
+                return BadRequest();
+            }
             try
             {
-                if (data.Title_id < 0 || data.User_id == null)
+                 var get = await _context.TaskTitle.Where(x => x.User_id == data.User_id && x.Id == data.Id).FirstOrDefaultAsync();
+                 if (get == null)
                 {
-                    return BadRequest();
+                    return StatusCode(404);
                 }
-                var get = await _context.TaskSubContents
-                         .Where(x => x.Title_id == data.Title_id)
-                         .OrderBy(x => x.Content_id)
-                         .ThenBy( x => x.Subtask_order)
-                         .ToListAsync();
-                          
-                          
-                if (get.Count == 0)
+                if ( get.Task_title == data.Task_title)
                 {
-                    return Ok(new { subtask = "0", Message = "If existing dats is not showing, please contact the admin." });
-                }   
-                if (get.Count > 0)
-                {
-                    return Ok(get);
+                    return StatusCode(200, "No update necessary; data was identical");
                 }
-                return StatusCode(500, "Error occured during transaction");
+                get.Task_title = data.Task_title;
+             
+                var saved = await _context.SaveChangesAsync();
+
+                if (saved > 0)
+                {
+                    return Ok(new
+                    {
+                        message = "Data saved successfully."
+                    });
+                }
+
+                return StatusCode(500, "An unknown error occurred while saving the data.");
             }
             catch (Exception ex)
             {
                 return StatusCode(500, ex.Message);
             }
         }
+
+        [HttpDelete("DeleteTasksTitle")]
+        public async Task<IActionResult> DeleteTasksTitle([FromQuery] DeleteTaskTitle data)
+        {
+            if (data == null)
+            {
+                return BadRequest();
+            }
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                string msg = "";
+                if (data == null)
+                {
+                    return BadRequest("Parameter is null.");
+                }
+                var del = await _context.TaskTitle.Where(x => x.User_id == data.User_id && x.Id == data.Id).FirstOrDefaultAsync();
+                if (del == null)
+                {
+                    return NotFound();
+                }
+                _context.TaskTitle.Remove(del);
+                var saved = await _context.SaveChangesAsync();
+                
+                if (saved <= 0)
+                {
+                    await transaction.RollbackAsync();
+                    return StatusCode(500, "Failed to delete data. Tasktitle");
+                }
+
+                var delTask = await _context.TaskContents.Where(x => x.User_id == data.User_id && x.Title_id == data.Id).ToListAsync();
+                var savedd = 1;
+                if (delTask == null || delTask.Count == 0)
+                {
+                    msg = "";
+                }
+                else
+                {
+                     _context.TaskContents.RemoveRange(delTask);
+                    savedd = await _context.SaveChangesAsync();
+                    if (savedd <= 0)
+                    {
+                        msg += " including its task contents";
+                        await transaction.RollbackAsync();
+                        return StatusCode(500, "Failed to delete data., task contents");
+                    }
+                }
+               
+                var delSub = await _context.TaskSubContents.Where(x => x.User_id == data.User_id && x.Title_id == data.Id).ToListAsync();
+                var saveddd = 1;
+                if (delSub == null || delSub.Count == 0 )
+                {
+                    msg = "";
+                } else
+                {
+                _context.TaskSubContents.RemoveRange(delSub);
+                savedd = await _context.SaveChangesAsync();
+
+                    msg += " and subtasks";
+                    if (savedd <= 0)
+                    {
+                        await transaction.RollbackAsync();
+                        return StatusCode(500, "Failed to delete subtask data. sibtasl");
+                    }
+                }
+
+                if (saved > 0 && savedd > 0 && saveddd > 0)
+                {
+                    await transaction.CommitAsync();
+                    return Ok(new
+                    {
+                        message = "Project deleted succesfully" + msg + "."
+                    });
+                }
+                await transaction.RollbackAsync();
+                if (saveddd <= 0)
+                {
+                    return StatusCode(500, "Failed to reorder data.");
+                }
+                return StatusCode(500, "An unknown error occured while saving the data.");
+            }
+
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, ex.Message);
+            }
+        }
+       
          [HttpGet("GetTaskContent")]
         public async Task<IActionResult> GetTaskContent([FromQuery]GetTaskContent data)
         {
+            if (data.User_id == null)
+            {
+                return BadRequest();
+            }
             try
             {
-                if (data.Title_id < 0 || data.User_id == null)
-                {
-                    return BadRequest();
-                }
                 var get = await _context.TaskContents
-                          .Where(x => x.Title_id == data.Title_id)
+                          .Where(x => x.User_id == data.User_id && x.Title_id == data.Title_id &&x.Date_created <= data.Date_created)
                           .OrderBy(x => x.Task_order).ToListAsync();
                 if (get.Count == 0)
                 {
@@ -132,29 +246,27 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
+
         [HttpPost("AddNewTaskContent")]
-        public async Task<ActionResult> AddNewTaskContent(ModifyTaskContent datas)
+        public async Task<ActionResult> AddNewTaskContent(ModifyTaskContent data)
         {
+            if (data == null)
+            {
+                return BadRequest("Parameter is null or empty.");
+            }
             try
             {
-                if (datas == null )
+                var taskContent = new TaskContents
                 {
-                    return BadRequest("Parameter is null or empty.");
-                }
+                    Title_id = data.Title_id,
+                    Task_order = data.Task_order,
+                    Task_details = data.Task_details,
+                    Date_created = data.Date_created,
+                    Status = 0,
+                    Status_modified = data.Date_created,
+                    User_id = data.User_id
+                };
 
-             
-                    var taskContent = new TaskContents
-                    {
-                        Title_id = datas.Title_id,
-                        Task_order = datas.Task_order,
-                        Task_details = datas.Task_details,
-                        Date_created = datas.Date_created,
-                        Status = 0,
-                        Status_modified = datas.Date_created
-
-                    };
-
-                
                 await _context.TaskContents.AddAsync(taskContent);
                 
                 var saved = await _context.SaveChangesAsync();
@@ -175,21 +287,22 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
+
         [HttpPut("ModTaskContent")]
-        public async Task<ActionResult> ModTaskContent(ModifyTaskContent datas)
-        {
+        public async Task<ActionResult> ModTaskContent(ModifyTaskContent data)
+         {
+            if (data == null)
+            {
+                return BadRequest("Parameter is null or empty.");
+            }
             try
             {
-                if (datas == null )
-                {
-                    return BadRequest("Parameter is null or empty.");
-                }
-                 var get = await _context.TaskContents.Where(x => x.Title_id == datas.Title_id && x.Id == datas.Id).FirstOrDefaultAsync();
-                if ( get.Task_details == datas.Task_details)
+                var get = await _context.TaskContents.Where(x => x.User_id == data.User_id && x.Title_id == data.Title_id && x.Id == data.Id).FirstOrDefaultAsync();
+                if ( get.Task_details == data.Task_details)
                 {
                     return StatusCode(200, "No update necessary; data was identical");
                 }
-                get.Task_details = datas.Task_details;
+                get.Task_details = data.Task_details;
              
                 var saved = await _context.SaveChangesAsync();
 
@@ -212,19 +325,23 @@ namespace apiprogresstracker.Controller
         [HttpDelete("DeleteTasksContent")]
         public async Task<IActionResult> DeleteTasksContent([FromBody] DeleteTaskContent data)
         {
+            if (data == null)
+            {
+                return BadRequest();
+            }
             await using var transaction = await _context.Database.BeginTransactionAsync();
-            try
 
+            try
             {
                 string msg;
                 if (data == null)
                 {
                     return BadRequest("Parameter is null.");
                 }
-                var del = await _context.TaskContents.Where(x => x.Title_id == data.Title_id && x.Id == data.Id).FirstOrDefaultAsync();
+                var del = await _context.TaskContents.Where(x => x.User_id == data.User_id && x.Title_id == data.Title_id && x.Id == data.Id).FirstOrDefaultAsync();
                 if (del == null)
                 {
-                    return NotFound();
+                    return StatusCode(404, "Does not exist");
                 }
                 _context.TaskContents.Remove(del);
                 var saved = await _context.SaveChangesAsync();
@@ -233,9 +350,7 @@ namespace apiprogresstracker.Controller
                     await transaction.RollbackAsync();
                     return StatusCode(500, "Failed to delete data.");
                 }
-                var delSub = await _context.TaskSubContents
-                         .Where(x => x.Content_id == data.Id)
-                         .ToListAsync();
+                var delSub = await _context.TaskSubContents.Where(x => x.User_id == data.User_id && x.Content_id == data.Id).ToListAsync();
                 var savedd = 1;
                 
                 if (delSub == null || delSub.Count == 0 )
@@ -254,9 +369,8 @@ namespace apiprogresstracker.Controller
                     }
                 }
 
-                var get = await _context.TaskContents
-                         .Where(x => x.Title_id == data.Title_id)
-                         .OrderBy(x => x.Task_order).ToListAsync();
+                var get = await _context.TaskContents.Where(x => x.User_id == data.User_id && x.Title_id == data.Title_id).OrderBy(x => x.Task_order).ToListAsync();
+
                 var nonidentical = 0;
 
                 for (int i = 0; i < get.Count; i++)
@@ -301,15 +415,19 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
+
         [HttpPut("UpdateTasksOrder")]
         public async Task<ActionResult> UpdateTasksOrder([FromBody] List<UpdateOrder> data)
         {
+            if (data == null)
+            {
+                return BadRequest();
+            }
             try
             {
-
-                var get = await _context.TaskContents.Where(x => x.Title_id == data[0].Title_id).ToListAsync();
+                var get = await _context.TaskContents.Where(x => x.User_id == data[0].User_id && x.Title_id == data[0].Title_id).ToListAsync();
                 var getCount = get.Count;
-                if (data == null)
+                if (get == null || getCount == 0)
                 {
                     return StatusCode(404, "Does not exist");
                 }
@@ -329,10 +447,8 @@ namespace apiprogresstracker.Controller
                             {
                                 continue;
                             }
-
                         }
                     }
-
                 }
 
                 var saved = await _context.SaveChangesAsync();
@@ -355,18 +471,22 @@ namespace apiprogresstracker.Controller
         [HttpPut("UpdateTaskContentStatus")]
         public async Task<ActionResult> UpdateTaskContentStatus(UpdateStatus data)
         {
+            if (data == null)
+            {
+                return BadRequest();
+            }
             try
             {
-
-                var get = await _context.TaskContents.Where(x => x.Title_id == data.Title_id && x.Id == data.Id).FirstOrDefaultAsync();
-                if (data == null)
+                var get = await _context.TaskContents.Where(x => x.User_id == data.User_id && x.Title_id == data.Title_id && x.Id == data.Id).FirstOrDefaultAsync();
+                if (get == null)
                 {
                     return StatusCode(404, "Does not exist");
                 }
-                if (get.Date_started == get.Date_created)
+                if (get.Date_started == null)
                 {
                     get.Date_started = data.Status_modified;
                 }
+                
                 get.Status = data.Status;
                 get.Status_modified = data.Status_modified;
 
@@ -386,23 +506,26 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, "A concurrency error occurred.");
             }
         }
-        
-       [HttpGet("GetSubTask")]
-        public async Task<IActionResult> GetSubTask(int id)
+
+        [HttpGet("GetAllSubTask")]
+        public async Task<IActionResult> GetTaskandSubTask([FromQuery]GetTaskContent data)
         {
             try
             {
-                if (id < 0)
+                if (data.Title_id < 0 || data.User_id == null)
                 {
                     return BadRequest();
                 }
                 var get = await _context.TaskSubContents
-                          .Where(x => x.Content_id == id)
-                          .OrderBy(x => x.Subtask_order).ToListAsync();
+                         .Where(x => x.User_id == data.User_id && x.Title_id == data.Title_id && x.Date_created <= x.Date_created)
+                         .OrderBy(x => x.Content_id)
+                         .ThenBy( x => x.Subtask_order)
+                         .ToListAsync();
+                          
                 if (get.Count == 0)
                 {
                     return Ok(new { subtask = "0", Message = "If existing dats is not showing, please contact the admin." });
-                }
+                }   
                 if (get.Count > 0)
                 {
                     return Ok(get);
@@ -414,28 +537,27 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
+       
         [HttpPost("AddNewSubTask")]
-        public async Task<ActionResult> AddNewSubTask(ModifySubTask datas)
+        public async Task<ActionResult> AddNewSubTask(ModifySubTask data)
         {
+            if (data == null )
+            {
+                return BadRequest("Parameter is null or empty.");
+            }
             try
             {
-                if (datas == null )
+                var subtasks = new TaskSubContents
                 {
-                    return BadRequest("Parameter is null or empty.");
-                }
-
-             
-                    var subtasks = new TaskSubContents
-                    {
-                        Title_id = datas.Title_id,
-                        Content_id = datas.Content_id,
-                        Subtask_order = datas.Subtask_order,
-                        Subtask = datas.Subtask,
-                        Date_created = datas.Date_created,
-                        Status = 0,
-                        Status_modified = datas.Date_created
-
-                    };
+                    Title_id = data.Title_id,
+                    Content_id = data.Content_id,
+                    Subtask_order = data.Subtask_order,
+                    Subtask = data.Subtask,
+                    Date_created = data.Date_created,
+                    Status = 0,
+                    Status_modified = data.Date_created,
+                    User_id = data.User_id
+                };
                 
                 await _context.TaskSubContents.AddAsync(subtasks);
                 
@@ -457,21 +579,26 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, ex.Message);
             }
         }
+
         [HttpPut("ModSubTask")]
-        public async Task<ActionResult> ModSubTask(ModifySubTask datas)
+        public async Task<ActionResult> ModSubTask(ModifySubTask data)
         {
+            if (data == null )
+            {
+                return BadRequest("Parameter is null or empty.");
+            }
             try
             {
-                if (datas == null )
+                var get = await _context.TaskSubContents.Where(x => x.User_id == data.User_id && x.Content_id == data.Content_id && x.Id == data.Id).FirstOrDefaultAsync();
+                if (get == null)
                 {
-                    return BadRequest("Parameter is null or empty.");
+                    return StatusCode(404, "Does not exist");
                 }
-                 var get = await _context.TaskSubContents.Where(x => x.Content_id == datas.Content_id && x.Id == datas.Id).FirstOrDefaultAsync();
-                if ( get.Subtask == datas.Subtask)
+                if ( get.Subtask == data.Subtask)
                 {
                     return StatusCode(200, "No update necessary; data was identical");
                 }
-                get.Subtask = datas.Subtask;
+                get.Subtask = data.Subtask;
              
                 var saved = await _context.SaveChangesAsync();
 
@@ -479,7 +606,7 @@ namespace apiprogresstracker.Controller
                 {
                     return Ok(new
                     {
-                        message = "Data saved successfully." + datas.Subtask
+                        message = "Data saved successfully."
                     });
                 }
 
@@ -491,33 +618,33 @@ namespace apiprogresstracker.Controller
             }
         }
         
-         [HttpDelete("DeleteSubTask")]
+        [HttpDelete("DeleteSubTask")]
         public async Task<IActionResult> DeleteSubTask([FromBody] DeleteSubTask data)
         {
+            if (data == null)
+            {
+                return BadRequest("Parameter is null.");
+            }
             await using var transaction = await _context.Database.BeginTransactionAsync();
             try
-
             {
-                if (data == null)
-                {
-                    return BadRequest("Parameter is null.");
-                }
-                 var del = await _context.TaskSubContents.Where(x => x.Content_id == data.Content_id && x.Id == data.Id).FirstOrDefaultAsync();
+                var del = await _context.TaskSubContents.Where(x => x.User_id == data.User_id && x.Content_id == data.Content_id && x.Id == data.Id).FirstOrDefaultAsync();
                 if (del == null)
                 {
-                    return NotFound();
+                    return StatusCode(404, "Does not exist");
                 }
                _context.TaskSubContents.Remove(del);
-                  var saved =  await _context.SaveChangesAsync();
+
+                var saved =  await _context.SaveChangesAsync();
+
                 if (saved <= 0)
                 {
                      await transaction.RollbackAsync();
                     return StatusCode(500, "Failed to delete data.");
                 }
 
-                var get = await _context.TaskSubContents
-                         .Where(x => x.Content_id == data.Content_id)
-                         .OrderBy(x => x.Subtask_order).ToListAsync();
+                var get = await _context.TaskSubContents.Where(x => x.User_id == data.User_id && x.Content_id == data.Content_id).OrderBy(x => x.Subtask_order).ToListAsync();
+
                 var nonidentical = 0;
 
                 for (int i = 0; i < get.Count; i++)
@@ -529,6 +656,7 @@ namespace apiprogresstracker.Controller
                     get[i].Subtask_order = i;
                    
                 }
+
                 if (nonidentical == 0)
                 {
                     await _context.SaveChangesAsync();
@@ -549,11 +677,13 @@ namespace apiprogresstracker.Controller
                     });
                 }
                 await transaction.RollbackAsync();
+                
                  if (savedd <= 0)
                     {
                     return StatusCode(500, "Failed to reorder data.");
                     }
-                    return StatusCode(500, "An unknown error occured while saving the data.");
+
+                return StatusCode(500, "An unknown error occured while saving the data.");
             }
 
             catch (Exception ex)
@@ -563,15 +693,18 @@ namespace apiprogresstracker.Controller
             }
         }
 
-         [HttpPut("UpdateSubTasksOrder")]
+        [HttpPut("UpdateSubTasksOrder")]
         public async Task<ActionResult> UpdateSubTasksOrder([FromBody] List<UpdateSubtaskOrder> data)
         {
+            if (data == null)
+            {
+                return BadRequest("Parameter is null.");
+            }
             try
             {
-
-                var get = await _context.TaskSubContents.Where(x => x.Content_id == data[0].Content_id).ToListAsync();
+                var get = await _context.TaskSubContents.Where(x => x.User_id == data[0].User_id && x.Content_id == data[0].Content_id).ToListAsync();
                 var getCount = get.Count;
-                if (data == null)
+                if (get == null)
                 {
                     return StatusCode(404, "Does not exist");
                 }
@@ -594,7 +727,6 @@ namespace apiprogresstracker.Controller
 
                         }
                     }
-
                 }
 
                 var saved = await _context.SaveChangesAsync();
@@ -614,18 +746,21 @@ namespace apiprogresstracker.Controller
             }
         }
 
-         [HttpPut("UpdateSubTaskStatus")]
+        [HttpPut("UpdateSubTaskStatus")]
         public async Task<ActionResult> UpdateSubTaskStatus(UpdateSubtaskStatus data)
         {
+            if (data == null)
+            {
+                return BadRequest("Parameter is null.");
+            }
             try
             {
-
-                var get = await _context.TaskSubContents.Where(x => x.Content_id == data.Content_id && x.Id == data.Id).FirstOrDefaultAsync();
-                if (data == null)
+                var get = await _context.TaskSubContents.Where(x => x.User_id == data.User_id && x.Content_id == data.Content_id && x.Id == data.Id).FirstOrDefaultAsync();
+                if (get == null)
                 {
                     return StatusCode(404, "Does not exist");
                 }
-                if (get.Date_started == get.Date_created)
+                if (get.Date_started == null)
                 {
                     get.Date_started = data.Status_modified;
                 }
