@@ -10,8 +10,8 @@ namespace apiprogresstracker.Model.Tasks
     {
         public int Id { get; set; }
         public string? Task_title { get; set; }
-        public DateTime Date_created { get; set; }
-        public string? User { get; set; }
+        public DateTime? Date_created { get; set; }
+        public string? User_id { get; set; }
 
         public ICollection<TaskContents>? TaskContents { get; set; }
     }
@@ -26,6 +26,7 @@ namespace apiprogresstracker.Model.Tasks
         public int? Status { get; set; }
         public DateTime? Date_started { get; set; }
         public DateTime? Status_modified { get; set; }
+        public string? User_id { get; set; }
         public TaskTitle? TaskTitle { get; set; }
         public ICollection<TaskSubContents>? TaskSubContents { get; set; }
     }
@@ -40,6 +41,7 @@ namespace apiprogresstracker.Model.Tasks
         public int? Status { get; set; }
         public DateTime? Date_started { get; set; }
         public DateTime? Status_modified { get; set; }
+        public string? User_id { get; set; }
         public TaskContents? TaskContents { get; set; }
     }
 }
