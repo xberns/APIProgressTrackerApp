@@ -3,7 +3,7 @@ using apiprogresstracker.Model.Notes;
 using Microsoft.AspNetCore.Mvc;
 using apiprogresstracker.ApplicationDBContext;
 using Microsoft.EntityFrameworkCore;
-
+using APIProgressTrackerApp.DTO.NotesDTO;
 namespace apiprogresstracker.Controller
 {
     [Route("api/[controller]")]
@@ -19,18 +19,19 @@ namespace apiprogresstracker.Controller
         [HttpPost("PostNote")]
         public async Task<ActionResult<Notes>> PostNote(Notes notes)
         {
-            var note = await _context.Notes.Where(x => x.Date_created == notes.Date_created).Select(x => x.Notes_content).ToListAsync();
-            if (note.Count > 0)
+            if (notes == null)
             {
-                return StatusCode(409, "Already exist.");
+                return BadRequest("Parameter is null.");
             }
             try
             {
-                if (notes == null)
+                var note = await _context.Notes
+                        .Where(x => x.User_id == notes.User_id&& x.Title_id == notes.Title_id && x.Id == notes.Id)
+                        .Select(x => x.Notes_content).FirstOrDefaultAsync();
+                if (note != null)
                 {
-                    return BadRequest("Parameter is null.");
+                    return StatusCode(409, "Already exist.");
                 }
-
                 await _context.Notes.AddAsync(notes);
                 var saved = await _context.SaveChangesAsync();
 
@@ -51,13 +52,21 @@ namespace apiprogresstracker.Controller
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+        
         [HttpGet("GetNote")]
-        public async Task<ActionResult> GetNote(DateTime date)
+        public async Task<ActionResult> GetNote([FromQuery]GetNotes notes)
         {
-            var formatdate = new DateOnly(date.Year, date.Month, date.Day);
+            if (notes == null)
+            {
+                return BadRequest("Parameter is null.");
+            }
             try
             {
-                var note = await _context.Notes.Where(x => x.Date_created == formatdate).Select(x => x.Notes_content).FirstOrDefaultAsync();
+                var note = await _context.Notes
+                            .Where(x => x.User_id == notes.User_id
+                                     && x.Title_id == notes.Title_id 
+                                     && x.Date_created == notes.Date_created)
+                            .Select(x => x.Notes_content).FirstOrDefaultAsync();
 
                  if (note == null)
                 {
@@ -73,20 +82,22 @@ namespace apiprogresstracker.Controller
         }
 
         [HttpPut("UpdateNote")]
-        public async Task<ActionResult> UpdateNote(Notes note)
+        public async Task<ActionResult> UpdateNote(Notes notes)
         {
+            if (notes == null)
+            {
+                return BadRequest("Parameter is null.");
+            }
             try
             {
+                var note = await _context.Notes.Where(x => x.User_id == notes.User_id && x.Title_id == notes.Title_id && x.Id == notes.Id).FirstOrDefaultAsync();
 
-                var notess = await _context.Notes.Where(x => x.Date_created == note.Date_created).FirstOrDefaultAsync();
-
-
-                if (notess == null)
+                if (note == null)
                 {
                     return StatusCode(404, "Does not exist");
                 }
 
-                notess.Notes_content = note.Notes_content;
+                note.Notes_content = notes.Notes_content;
 
                 var saved = await _context.SaveChangesAsync();
                 if (saved > 0)
@@ -94,7 +105,7 @@ namespace apiprogresstracker.Controller
                     return Ok(new
                     {
                         message = "Data updated successfully.",
-                        data = note.Notes_content
+                        data = notes.Notes_content
                     });
                 }
 
@@ -109,21 +120,23 @@ namespace apiprogresstracker.Controller
         }
         
         [HttpDelete("DeleteNote")]
-        public async Task<ActionResult> DeleteNote(DateTime date)
+        public async Task<ActionResult> DeleteNote([FromQuery]GetNotes notes)
         {
+            if (notes == null)
+            {
+                return BadRequest("Parameter is null.");
+            }
             try
             {
-                var formatdate = new DateOnly(date.Year, date.Month, date.Day);
+                var note = await _context.Notes
+                            .Where(x => x.User_id == notes.User_id && x.Title_id == notes.Title_id && x.Date_created == notes.Date_created).FirstOrDefaultAsync();
 
-                var notess = await _context.Notes.Where(x => x.Date_created == formatdate).FirstOrDefaultAsync();
-
-
-                if (notess == null)
+                if (note == null)
                 {
                     return StatusCode(404, "Does not exist");
                 }
 
-               _context.Notes.Remove(notess);
+               _context.Notes.Remove(note);
 
                 var saved = await _context.SaveChangesAsync();
                 if (saved > 0)
@@ -136,15 +149,11 @@ namespace apiprogresstracker.Controller
 
                 return StatusCode(500, "An unknown error occurred while saving.");
 
-            }
-            catch (DbUpdateConcurrencyException)
+            }catch (DbUpdateConcurrencyException)
             {
                 // Optional: handle concurrency issues
                 return StatusCode(500, "A concurrency error occurred.");
             }
         }
-
-
-
     }
 }
