@@ -22,9 +22,16 @@ namespace APIProgressTrackerApp.Controller
         [HttpGet]
         public async Task<IActionResult> GetProgress([FromQuery] GetTaskContent data)
         {
+            if (data == null)
+            {
+                return BadRequest("Parameter is null.");
+            }
             try{
                 var task =  await _context.TaskContents
-                            .GroupBy(x => x.Title_id == data.Title_id)
+                            .Where(x => x.User_id == data.User_id
+                                     && x.Title_id == data.Title_id 
+                                     && x.Date_created <= data.Date_created)
+                            .GroupBy(x => x.Title_id)
                             .Select(o => new
                             {
                                 taskTotal = o.Count(),
@@ -40,7 +47,10 @@ namespace APIProgressTrackerApp.Controller
             }
 
              var subtask = await _context.TaskSubContents
-                            .GroupBy(x => x.Title_id == data.Title_id)
+                            .Where(x => x.User_id == data.User_id
+                                     && x.Title_id == data.Title_id 
+                                     && x.Date_created <= data.Date_created)
+                            .GroupBy(x => x.Title_id)
                             .Select(o => new
                             {
                                 subtaskTotal = o.Count(),
