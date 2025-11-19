@@ -67,9 +67,9 @@ namespace apiprogresstracker.Controller
                  var taskTitleDetails = new TaskTitle
                     {
                         Task_title = data.Task_title,
+                        Task_description = data.Task_description,
                         User_id = data.User_id,
                         Date_created = data.Date_created,
-
                     };
                     
                 await _context.TaskTitle.AddAsync(taskTitleDetails);
@@ -106,12 +106,12 @@ namespace apiprogresstracker.Controller
                 {
                     return StatusCode(404);
                 }
-                if ( get.Task_title == data.Task_title)
+                if ( get.Task_title == data.Task_title && get.Task_description == data.Task_description)
                 {
                     return StatusCode(200, "No update necessary; data was identical");
                 }
                 get.Task_title = data.Task_title;
-             
+                get.Task_description = data.Task_description;
                 var saved = await _context.SaveChangesAsync();
 
                 if (saved > 0)

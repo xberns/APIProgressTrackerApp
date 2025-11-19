@@ -10,6 +10,7 @@ namespace apiprogresstracker.Model.Tasks
     {
         public int Id { get; set; }
         public string? Task_title { get; set; }
+        public string? Task_description { get; set; }
         public DateTime? Date_created { get; set; }
         public string? User_id { get; set; }
 
