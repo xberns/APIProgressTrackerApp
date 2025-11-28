@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+
 using apiprogresstracker.Model.Notes;
 using apiprogresstracker.Model.Calendar;
-using apiprogresstracker.Model.Common;
 using apiprogresstracker.Model.Tasks;
+using apiprogresstracker.Model.User;
 using Microsoft.EntityFrameworkCore;
 
 
@@ -24,6 +21,7 @@ namespace apiprogresstracker.ApplicationDBContext
         public DbSet<TaskTitle> TaskTitle { get; set; }
         public DbSet<TaskContents> TaskContents { get; set; }
         public DbSet<TaskSubContents> TaskSubContents { get; set; }
+        public DbSet<UserAccount> UserAccount { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
