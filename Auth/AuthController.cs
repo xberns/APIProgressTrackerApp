@@ -24,104 +24,46 @@ public class AuthController : ControllerBase
         _emailService = emailService;
     }
 
-    [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(request.Email_address) ||
-                string.IsNullOrWhiteSpace(request.Password))
-            {
-                return BadRequest("Email and password are required.");
-            }   
-            var user = await _context.UserAccount
-                .FirstOrDefaultAsync(u => u.Email_address == request.Email_address);
-
-            if (user == null)
-                return Unauthorized("Invalid username or password");
-
-            if (user.Is_verified == 0)
-                return Unauthorized("Email not verified. Please check your inbox.");
-
-            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-            if (!isPasswordValid)
-                return Unauthorized("Invalid username or password");
-
-            var token = _tokenService.GenerateToken(user.User_id.ToString());
-
-            return Ok(new { accessToken = token });
-        }
-        catch(Exception ex)
-        {
-            return StatusCode(500, ex.Message);
-        }
-    }
-
     [HttpPost("signup")]
     public async Task<IActionResult> Signup([FromBody] SignupRequest request)
     {
         try
         {
-            
-           if (string.IsNullOrWhiteSpace(request.Username) ||
+            if (string.IsNullOrWhiteSpace(request.Username) ||
                 string.IsNullOrWhiteSpace(request.Email_address) ||
                 string.IsNullOrWhiteSpace(request.Password))
-            {
                 return BadRequest("All fields are required.");
-            }
+
+            // Username validation
             if (request.Username.Length < 3 || request.Username.Length > 20)
-                 return BadRequest("Username must be between 3 and 20 characters.");
-            var usernameRegex = @"^[a-zA-Z0-9_.]+$";
-            if (!Regex.IsMatch( request.Username, usernameRegex))
+                return BadRequest("Username must be between 3 and 20 characters.");
+            if (!Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_.]+$"))
                 return BadRequest("Username can only contain letters, numbers, underscores, or dots.");
 
-            try
-            {
-                var addr = new System.Net.Mail.MailAddress(request.Email_address);
-            }
-            catch (FormatException)
-            {
-                return BadRequest("Invalid email format.");
-            }
+            // Email validation
+            try { var addr = new System.Net.Mail.MailAddress(request.Email_address); }
+            catch { return BadRequest("Invalid email format."); }
 
             var allowedDomains = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "gmail.com",
-                "outlook.com",
-                "yahoo.com",
+                "gmail.com", "outlook.com", "yahoo.com"
             };
-
             var emailDomain = request.Email_address.Split('@').Last();
             if (!allowedDomains.Contains(emailDomain))
-            {
-                return BadRequest("Email domain not supported. Use Gmail, Outlook, or Yahoo.");
-            }
+                return BadRequest("Email domain not supported.");
 
+            // Password validation
             var password = request.Password;
+            if (password.Length < 8 || !password.Any(char.IsUpper) || !password.Any(char.IsLower) ||
+                !password.Any(char.IsDigit) || !password.Any(ch => "!@#$%^&*()_-+=<>?/{}~|".Contains(ch)))
+                return BadRequest("Password must meet complexity requirements.");
 
-            if (password.Length < 8)
-                return BadRequest("Password must be at least 8 characters long.");
-
-            if (!password.Any(char.IsUpper))
-                return BadRequest("Password must contain at least one uppercase letter.");
-
-            if (!password.Any(char.IsLower))
-                return BadRequest("Password must contain at least one lowercase letter.");
-
-            if (!password.Any(char.IsDigit))
-                return BadRequest("Password must contain at least one number.");
-
-            if (!password.Any(ch => "!@#$%^&*()_-+=<>?/{}~|".Contains(ch)))
-                return BadRequest("Password must contain at least one special character.");
-            
             if (await _context.UserAccount.AnyAsync(u => u.Username == request.Username))
                 return BadRequest("Username already exists.");
-
             if (await _context.UserAccount.AnyAsync(u => u.Email_address == request.Email_address))
                 return BadRequest("Email already exists.");
 
-           var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
-           
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
             var verificationToken = Guid.NewGuid().ToString();
             var userId = Guid.NewGuid().ToString();
 
@@ -139,45 +81,113 @@ public class AuthController : ControllerBase
 
             _context.UserAccount.Add(user);
             var saved = await _context.SaveChangesAsync();
-    
-                if (saved <= 0)
-                {
-                    return StatusCode(500, "Account creation failed.");
-                }
-        _ = Task.Run(async () =>
+            if (saved <= 0) return StatusCode(500, "Account creation failed.");
+
+            _ = Task.Run(async () =>
             {
-                try
-                {
-                    await _emailService.SendVerificationEmail(user.Email_address, user.Username, verificationToken);
-                    Console.WriteLine("Verification email sent successfully.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Email failed: " + ex.Message);
-                }
-            }
-            );
+                try { await _emailService.SendVerificationEmail(user.Email_address, user.Username, verificationToken); }
+                catch (Exception ex) { Console.WriteLine("Email failed: " + ex.Message); }
+            });
+
             return Ok("User created successfully! Please check your email to verify your account.");
         }
-        catch (Exception ex)
-        {
-            return StatusCode(500, ex.Message);
-        }
+        catch (Exception ex) { return StatusCode(500, ex.Message); }
     }
 
     [HttpGet("verify")]
     public async Task<IActionResult> VerifyEmail([FromQuery] string token)
     {
         var user = await _context.UserAccount.FirstOrDefaultAsync(u => u.Verification_token == token);
-        if (user == null)
-            return BadRequest("Invalid verification token");
+        if (user == null) return BadRequest("Invalid verification token");
 
         user.Is_verified = 1;
-        user.Is_active =1;
+        user.Is_active = 1;
         user.Verification_token = null;
         await _context.SaveChangesAsync();
 
         return Ok("Email verified successfully! You can now log in.");
+    }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Email_address) || string.IsNullOrWhiteSpace(request.Password))
+                return BadRequest("Email and password are required.");
+
+            var user = await _context.UserAccount
+                .FirstOrDefaultAsync(u => u.Email_address == request.Email_address);
+
+            if (user == null) return Unauthorized("Invalid username or password");
+            if (user.Is_verified == 0) return Unauthorized("Email not verified.");
+
+            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            if (!isPasswordValid) return Unauthorized("Invalid username or password");
+
+            var accessToken = _tokenService.GenerateToken(user.User_id);
+            var refreshTokenValue = _tokenService.GenerateRefreshToken();
+
+            var refreshToken = new RefreshToken
+            {
+                Token = refreshTokenValue,
+                ExpiryDate = DateTime.UtcNow.AddDays(7),
+                IsRevoked = 0,
+                User_id = user.User_id,
+            };
+
+            _context.RefreshToken.Add(refreshToken);
+            await _context.SaveChangesAsync();
+            Response.Cookies.Append("refreshToken", refreshTokenValue, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
+            return Ok(new
+            {
+                accessToken,
+                username = user.Username
+            });
+        }
+        catch (Exception ex) { return StatusCode(500, ex.Message); }
+    }
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh([FromBody] RefreshRequest model)
+    {
+        var refreshToken = await _context.RefreshToken
+            .Include(rt => rt.UserAccount)
+            .FirstOrDefaultAsync(rt => rt.Token == model.RefreshToken);
+
+        if (refreshToken == null) return Unauthorized("Invalid refresh token");
+        if (refreshToken.ExpiryDate < DateTime.UtcNow) return Unauthorized("Refresh token expired");
+        if (refreshToken.IsRevoked == 1) return Unauthorized("Refresh token revoked");
+
+        var user = refreshToken.UserAccount;
+
+        // Revoke old token
+        refreshToken.IsRevoked = 1;
+
+        // Generate new refresh token
+        var newRefreshToken = new RefreshToken
+        {
+            Token = _tokenService.GenerateRefreshToken(),
+            ExpiryDate = DateTime.UtcNow.AddDays(7),
+            User_id = user.User_id
+        };
+        _context.RefreshToken.Add(newRefreshToken);
+
+        // Generate new access token
+        var newAccessToken = _tokenService.GenerateToken(user.User_id);
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            accessToken = newAccessToken,
+            refreshToken = newRefreshToken.Token
+        });
     }
 
 }
