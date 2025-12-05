@@ -22,6 +22,7 @@ namespace apiprogresstracker.ApplicationDBContext
         public DbSet<TaskContents> TaskContents { get; set; }
         public DbSet<TaskSubContents> TaskSubContents { get; set; }
         public DbSet<UserAccount> UserAccount { get; set; }
+        public DbSet<RefreshToken> RefreshToken { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -32,12 +33,19 @@ namespace apiprogresstracker.ApplicationDBContext
                .WithOne(u => u.TaskTitle)
                .HasForeignKey(t => t.Title_id);
 
-             modelBuilder.Entity<TaskContents>()
-               .HasMany(t => t.TaskSubContents)
-               .WithOne(u => u.TaskContents)
-               .HasForeignKey(t => t.Content_id);
+            modelBuilder.Entity<TaskContents>()
+              .HasMany(t => t.TaskSubContents)
+              .WithOne(u => u.TaskContents)
+              .HasForeignKey(t => t.Content_id);
 
-         }
+            modelBuilder.Entity<RefreshToken>()
+              .HasOne(rt => rt.UserAccount)
+              .WithMany(u => u.RefreshTokens)
+              .HasForeignKey(rt => rt.User_id)
+              .HasPrincipalKey(u => u.User_id)
+              .OnDelete(DeleteBehavior.Cascade);
+
+        }
     }
 
 }

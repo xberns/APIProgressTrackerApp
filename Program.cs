@@ -20,6 +20,9 @@ builder.Services.AddCors(options =>
 
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"));
+builder.Services.AddScoped<ITokenService, TokenService>();
+
 
 
 builder.Services.AddTransient<TokenService>();
