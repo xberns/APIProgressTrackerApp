@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 using APIProgressTrackerApp.DTO.UserDTO;
 using apiprogresstracker.Model.User;
 using apiprogresstracker.ApplicationDBContext;
@@ -28,8 +29,13 @@ public class AuthController : ControllerBase
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(request.Email_address) ||
+                string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest("Email and password are required.");
+            }   
             var user = await _context.UserAccount
-                .FirstOrDefaultAsync(u => u.Username == request.Username);
+                .FirstOrDefaultAsync(u => u.Email_address == request.Email_address);
 
             if (user == null)
                 return Unauthorized("Invalid username or password");
@@ -54,17 +60,68 @@ public class AuthController : ControllerBase
     [HttpPost("signup")]
     public async Task<IActionResult> Signup([FromBody] SignupRequest request)
     {
-        await using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
+            
+           if (string.IsNullOrWhiteSpace(request.Username) ||
+                string.IsNullOrWhiteSpace(request.Email_address) ||
+                string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest("All fields are required.");
+            }
+            if (request.Username.Length < 3 || request.Username.Length > 20)
+                 return BadRequest("Username must be between 3 and 20 characters.");
+            var usernameRegex = @"^[a-zA-Z0-9_.]+$";
+            if (!Regex.IsMatch( request.Username, usernameRegex))
+                return BadRequest("Username can only contain letters, numbers, underscores, or dots.");
+
+            try
+            {
+                var addr = new System.Net.Mail.MailAddress(request.Email_address);
+            }
+            catch (FormatException)
+            {
+                return BadRequest("Invalid email format.");
+            }
+
+            var allowedDomains = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "gmail.com",
+                "outlook.com",
+                "yahoo.com",
+            };
+
+            var emailDomain = request.Email_address.Split('@').Last();
+            if (!allowedDomains.Contains(emailDomain))
+            {
+                return BadRequest("Email domain not supported. Use Gmail, Outlook, or Yahoo.");
+            }
+
+            var password = request.Password;
+
+            if (password.Length < 8)
+                return BadRequest("Password must be at least 8 characters long.");
+
+            if (!password.Any(char.IsUpper))
+                return BadRequest("Password must contain at least one uppercase letter.");
+
+            if (!password.Any(char.IsLower))
+                return BadRequest("Password must contain at least one lowercase letter.");
+
+            if (!password.Any(char.IsDigit))
+                return BadRequest("Password must contain at least one number.");
+
+            if (!password.Any(ch => "!@#$%^&*()_-+=<>?/{}~|".Contains(ch)))
+                return BadRequest("Password must contain at least one special character.");
+            
             if (await _context.UserAccount.AnyAsync(u => u.Username == request.Username))
-            return BadRequest("Username already exists");
+                return BadRequest("Username already exists.");
 
             if (await _context.UserAccount.AnyAsync(u => u.Email_address == request.Email_address))
-                return BadRequest("Email already exists");
+                return BadRequest("Email already exists.");
 
-            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
-
+           var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
+           
             var verificationToken = Guid.NewGuid().ToString();
             var userId = Guid.NewGuid().ToString();
 
@@ -82,18 +139,28 @@ public class AuthController : ControllerBase
 
             _context.UserAccount.Add(user);
             var saved = await _context.SaveChangesAsync();
-
-            var success = await _emailService.SendVerificationEmail(user.Email_address,user.Username, verificationToken);
-            if (saved == 0 || success == false)
+    
+                if (saved <= 0)
                 {
-                    await transaction.RollbackAsync();
+                    return StatusCode(500, "Account creation failed.");
                 }
-            await transaction.CommitAsync();
+        _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendVerificationEmail(user.Email_address, user.Username, verificationToken);
+                    Console.WriteLine("Verification email sent successfully.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Email failed: " + ex.Message);
+                }
+            }
+            );
             return Ok("User created successfully! Please check your email to verify your account.");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return StatusCode(500, ex.Message);
         }
     }
