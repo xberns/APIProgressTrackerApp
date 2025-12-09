@@ -127,22 +127,29 @@ public class AuthController : ControllerBase
 
             var accessToken = _tokenService.GenerateToken(user.User_id);
             var refreshTokenValue = _tokenService.GenerateRefreshToken();
-
             var refreshToken = new RefreshToken
             {
                 Token = refreshTokenValue,
                 ExpiryDate = DateTime.UtcNow.AddDays(7),
+                Date_created = DateTime.UtcNow,
                 IsRevoked = 0,
                 User_id = user.User_id,
             };
 
             _context.RefreshToken.Add(refreshToken);
             await _context.SaveChangesAsync();
+            //Match cookies
+             Response.Cookies.Delete("refreshToken", new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None
+            });
             Response.Cookies.Append("refreshToken", refreshTokenValue, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
+                SameSite = SameSiteMode.None,
                 Expires = DateTime.UtcNow.AddDays(7)
             });
             return Ok(new
@@ -153,40 +160,88 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex) { return StatusCode(500, ex.Message); }
     }
-    [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh([FromBody] RefreshRequest model)
+    //[Authorize]
+    [HttpGet("verify-token")]
+    public IActionResult VerifyToken()
     {
+        return Ok(new { message = "Token is valid" });
+    }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh()
+    {
+        
+        var refreshTokenValue = Request.Cookies["refreshToken"];
+        if (string.IsNullOrEmpty(refreshTokenValue))
+            return Unauthorized("No refresh token found");
+
+
         var refreshToken = await _context.RefreshToken
             .Include(rt => rt.UserAccount)
-            .FirstOrDefaultAsync(rt => rt.Token == model.RefreshToken);
+            .FirstOrDefaultAsync(rt => rt.Token == refreshTokenValue);
 
-        if (refreshToken == null) return Unauthorized("Invalid refresh token");
-        if (refreshToken.ExpiryDate < DateTime.UtcNow) return Unauthorized("Refresh token expired");
-        if (refreshToken.IsRevoked == 1) return Unauthorized("Refresh token revoked");
+        if (refreshToken == null) {  
+            Response.Cookies.Delete("refreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+
+            return Unauthorized("Invalid refresh token");
+        }
+
+        if (refreshToken.ExpiryDate < DateTime.UtcNow) {
+              Response.Cookies.Delete("refreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+
+            return Unauthorized("Refresh token expired");
+        }
+
+        if (refreshToken.IsRevoked == 1) {
+              Response.Cookies.Delete("refreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+
+            return Unauthorized("Refresh token revoked");
+        }
 
         var user = refreshToken.UserAccount;
 
-        // Revoke old token
         refreshToken.IsRevoked = 1;
+        refreshToken.Date_used = DateTime.UtcNow;
 
-        // Generate new refresh token
+        var newRefreshTokenValue = _tokenService.GenerateRefreshToken();
         var newRefreshToken = new RefreshToken
         {
-            Token = _tokenService.GenerateRefreshToken(),
+            Token = newRefreshTokenValue,
             ExpiryDate = DateTime.UtcNow.AddDays(7),
             User_id = user.User_id
         };
         _context.RefreshToken.Add(newRefreshToken);
 
-        // Generate new access token
         var newAccessToken = _tokenService.GenerateToken(user.User_id);
 
         await _context.SaveChangesAsync();
 
+        Response.Cookies.Append("refreshToken", newRefreshTokenValue, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTime.UtcNow.AddDays(7)
+        });
+
         return Ok(new
         {
-            accessToken = newAccessToken,
-            refreshToken = newRefreshToken.Token
+            accessToken = newAccessToken
         });
     }
 
