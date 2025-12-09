@@ -244,5 +244,34 @@ public class AuthController : ControllerBase
             accessToken = newAccessToken
         });
     }
+    
+   [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        var refreshTokenValue = Request.Cookies["refreshToken"];
+
+        if (!string.IsNullOrEmpty(refreshTokenValue))
+        {
+            var token = await _context.RefreshToken
+                .FirstOrDefaultAsync(t => t.Token == refreshTokenValue);
+
+            if (token != null)
+            {
+                token.IsRevoked = 1;
+                token.Date_used = DateTime.UtcNow;
+                _context.RefreshToken.Update(token);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        Response.Cookies.Delete("refreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+
+        return Ok(new { message = "Logged out successfully" });
+    }
 
 }
