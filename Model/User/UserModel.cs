@@ -29,6 +29,9 @@ namespace apiprogresstracker.Model.User
         // foreign key
         public string? User_id { get; set; }
         public UserAccount UserAccount { get; set; }
+
+        public DateTime? Date_created { get; set; }
+        public DateTime? Date_used { get; set; }
     }
 
 
