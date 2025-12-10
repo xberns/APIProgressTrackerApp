@@ -231,13 +231,13 @@ public class AuthController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        Response.Cookies.Append("refreshToken", newRefreshTokenValue, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Expires = DateTime.UtcNow.AddDays(7)
-        });
+         Response.Cookies.Append("refreshToken", refreshTokenValue, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
 
         return Ok(new
         {
